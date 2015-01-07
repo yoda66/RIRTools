@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import csv
 import re
 import hashlib
@@ -18,7 +19,7 @@ class RIRACL:
         self.dbh = sqlite3.connect(self.dbname)
         self.ipv4 = []
 
-    def _get_ipv4_cidr(self, cc=None):
+    def _get_ipv4_cidr(self, country=None):
         cur = self.dbh.cursor()
         sql = """\
 SELECT  country_codes.cc,
@@ -29,10 +30,12 @@ ON country_codes.cc = rir.cc
 WHERE rir.type = 'ipv4'
 AND (rir.status = 'assigned' or rir.status = 'allocated')
 """
-        if cc:
-            sql += 'AND rir.cc == %s' % (cc)
+        if country:
+            sql += "AND country_codes.name like '%s%%'" % (country)
 
-        sql += 'ORDER BY country_codes.cc, rir.start_binary ASC'
+        sql += """
+ORDER BY country_codes.cc, rir.start_binary ASC"""
+
         cur.execute(sql)
         for row in cur.fetchall():
             self.ipv4.append(row)
@@ -48,10 +51,13 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
                 lastcc = cc
             print '-A INPUT -p ip -s %s -j DROP' % (cidr)
 
-    def run(self):
-        self._get_ipv4_cidr()
+    def run(self, country=None):
+        self._get_ipv4_cidr(country=country)
         self._ipv4_iptables()
 
 if __name__ == '__main__':
     riracl = RIRACL()
-    riracl.run()
+    if len(sys.argv) > 1:
+        riracl.run(country=sys.argv[1])
+    else:
+        riracl.run()
