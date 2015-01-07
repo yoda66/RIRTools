@@ -7,26 +7,32 @@ import hashlib
 import math
 import urllib2
 import sqlite3
+import socket
 from datetime import datetime, timedelta
 
 
 class RIRDatabase:
 
     def __init__(self):
+        self.ALLRIRS = [
+            'arin', 'apnic', 'afrinic', 'lacnic', 'ripencc'
+        ]
         dbhome = '%s/.rirdb' % (os.path.expanduser('~'))
         if not os.path.exists(dbhome):
             os.mkdir(dbhome)
         self.dbname = '%s/rir.db' % (dbhome)
+        self.lastfetch = '%s/lastfetchdate' % (dbhome)
         self.dbh = self._sqlite3_connect()
 
     def _sqlite3_connect(self):
         dbh = sqlite3.connect(self.dbname)
+        dbh.text_factory = str
         cur = dbh.cursor()
         sql = """\
 CREATE TABLE IF NOT EXISTS rir
 (
     registry TEXT, cc TEXT, type TEXT,
-    start TEXT, value TEXT, cidr TEXT,
+    start TEXT, start_binary INT, value TEXT, cidr TEXT,
     date TEXT, status TEXT, reg_id TEXT
 )
 """
@@ -69,22 +75,32 @@ CREATE TABLE IF NOT EXISTS country_codes
                     continue
 
             cidr = ''
+            start_binary = 0
             if type == 'ipv4':
+                start_binary = socket.inet_pton(
+                    socket.AF_INET, start
+                )
                 cidr = '%s/%d' % \
                     (
                         start,
                         32 - int(math.log(int(value), 2))
                     )
+            elif type == 'ipv6':
+                start_binary = socket.inet_pton(
+                    socket.AF_INET6, start
+                )
 
             sql = """\
-INSERT INTO rir
-(registry, cc, type, start, value, cidr, date, status, reg_id)
-VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
+INSERT INTO rir (
+    registry, cc, type, start, start_binary,
+    value, cidr, date, status, reg_id
+)
+VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
 """
             try:
                 params = [
-                    registry, cc, type, start, value,
-                    cidr, date, status, reg_id
+                    registry, cc, type, start, start_binary,
+                    value, cidr, date, status, reg_id
                 ]
                 cur.execute(sql, params)
             except:
@@ -118,7 +134,7 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
         req = urllib2.Request(url)
 
         try:
-            print '[*] Fetching [%s]' % (url)
+            print '[*] Fetching [%s]' % (datafile)
             f = urllib2.urlopen(req)
             data = f.read()
             md5_1 = hashlib.md5(data).hexdigest()
@@ -131,14 +147,15 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
             return [url, 'error', e]
 
     def regional_registry_data(self):
-        ALLRIRS = ['arin', 'apnic', 'afrinic', 'lacnic', 'ripencc']
-
-        for rir in ALLRIRS:
+        for rir in self.ALLRIRS:
             done = False
             rdata = self._get_rirdata(rir, 'latest')
             if rdata[1] == 'ok':
-                ret = self._insert_rir_recs(rir, rdata[2])
-                print '[*] Records inserted for %s: %s' % (rir, ret)
+                recs, errs = self._insert_rir_recs(rir, rdata[2])
+                print '[*] Inserted %d records for [%s]' % \
+                    (recs, rir)
+                if errs > 0:
+                    raise Exception('[*] Errors on insert %d' % (errs))
                 done = True
             else:
                 print '[-] ERROR: %s' % (rdata)
@@ -148,8 +165,11 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
                 date = today - timedelta(days=-days)
                 rdata = self._get_rirdata(rir, date.strftime('%Y%m%d'))
                 if rdata[1] == 'ok':
-                    ret = self._insert_rir_recs(rir, rdata[2])
-                    print '[*] Records inserted for %s: %s' % (rir, ret)
+                    recs, errs = self._insert_rir_recs(rir, rdata[2])
+                    print '[*] Inserted %d records for [%s]' % \
+                        (recs, rir)
+                    if errs > 0:
+                        raise Exception('[*] Errors on insert %d' % (errs))
                     done = True
                 else:
                     print '[-] ERROR: %s' % (rdata)
@@ -181,9 +201,31 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
         self.dbh.commit()
         print '[*] %d country codes updated.' % (recs)
 
+    def has_run_today(self):
+        today = datetime.utcnow().strftime('%Y%m%d')
+        try:
+            f = open(self.lastfetch, 'r')
+            last = f.read()[:-1]
+            f.close()
+            if today == last:
+                return True
+        except:
+            pass
+        return False
+
+    def update_lastdate(self):
+        today = datetime.utcnow().strftime('%Y%m%d')
+        f = open(self.lastfetch, 'w')
+        f.write('%s\n' % (today))
+        f.close()
+
     def run(self):
+        if self.has_run_today():
+            print '[*] Exiting: Data has already been fetched today'
+            return
         self.update_country_codes()
         self.regional_registry_data()
+        self.update_lastdate()
 
 
 if __name__ == '__main__':
