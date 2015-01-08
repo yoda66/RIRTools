@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
+import argparse
 import os
 import sys
+import struct
+import socket
 import csv
 import re
 import hashlib
@@ -18,6 +21,10 @@ class RIRACL:
         self.dbname = '%s/rir.db' % (dbhome)
         self.dbh = sqlite3.connect(self.dbname)
         self.ipv4 = []
+
+    def _cidr2mask(self, cidr):
+        b_mask = (0xffffffff00000000 >> int(cidr)) & 0xffffffff
+        return socket.inet_ntoa(struct.pack('!L', b_mask))
 
     def _get_ipv4_cidr(self, country=None):
         cur = self.dbh.cursor()
@@ -51,13 +58,56 @@ ORDER BY country_codes.cc, rir.start_binary ASC"""
                 lastcc = cc
             print '-A INPUT -p ip -s %s -j DROP' % (cidr)
 
-    def run(self, country=None):
-        self._get_ipv4_cidr(country=country)
-        self._ipv4_iptables()
+    def _ipv4_asa(self):
+        lastcc = ''
+        objects = []
+        for line in self.ipv4:
+            cc = line[0]
+            country = line[1]
+            cidrnet = line[2]
+            network, cidr = cidrnet.split('/')
+            mask = self._cidr2mask(cidr)
+            if cc != lastcc:
+                objname = 'CountryCode:%s' % (cc)
+                objects.append(objname)
+                print """
+! %s: %s
+object-group network %s""" % (cc, country, objname)
+                lastcc = cc
+            print '    network-object %s %s' % (network, mask)
+
+        print '!\n!'
+        for obj in objects:
+            print """\
+access-list deny_country_ingress extended \
+deny ip object-group %s any""" % (obj)
+
+        print '!\n!'
+        for obj in objects:
+            print """\
+access-list deny_country_egress extended \
+deny ip any object-group %s""" % (obj)
+
+    def run(self, options):
+        self._get_ipv4_cidr(country=options.country)
+        if options.iptables:
+            self._ipv4_iptables()
+        if options.asa:
+            self._ipv4_asa()
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--iptables', action='store_true',
+        default=False,
+        help='produce IP tables output')
+    parser.add_argument(
+        '--asa', action='store_true',
+        default=False,
+        help='produce Cisco ASA output')
+    parser.add_argument(
+        '--country', help='specify country to produce output for'
+    )
+    options = parser.parse_args()
     riracl = RIRACL()
-    if len(sys.argv) > 1:
-        riracl.run(country=sys.argv[1])
-    else:
-        riracl.run()
+    riracl.run(options)
