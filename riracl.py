@@ -26,6 +26,10 @@ class RIRACL:
         b_mask = (0xffffffff00000000 >> int(cidr)) & 0xffffffff
         return socket.inet_ntoa(struct.pack('!L', b_mask))
 
+    def _cidr2revmask(self, cidr):
+        b_mask = ~(0xffffffff00000000 >> int(cidr)) & 0xffffffff
+        return socket.inet_ntoa(struct.pack('!L', b_mask))
+
     def _get_dbrecords(self, options):
         cur = self.dbh.cursor()
         if options.ipv4 and not options.ipv6:
@@ -77,7 +81,6 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
     def _asa(self, options):
         lastcc = ''
         objects = []
-        print '! -- BEGIN --'
         for line in self.records:
             cc = line[0]
             country = line[1]
@@ -112,40 +115,110 @@ deny ip object-group %s any""" % (obj)
             print """\
 access-list deny_country_egress extended \
 deny ip any object-group %s""" % (obj)
-        print '! -- END --'
+
+    def _cisco_switch(self, options):
+        lastcc = ''
+        for line in self.records:
+            cc = line[0]
+            country = line[1]
+            if not country:
+                country = '[Unknown ISO-3166 Country Code]'
+            rirtype = line[5]
+            if cc != lastcc:
+                header = '! %s: %s' % (cc, country)
+                if options.ipv4:
+                    header += '\nip access-list extended %s:%s' % \
+                        (cc, country)
+                elif options.ipv6:
+                    header += '\nipv6 access-list %s:%s' % (cc, country)
+                print '%s' % (header)
+                lastcc = cc
+            if options.ipv4 and rirtype == 'ipv4':
+                network, cidr = line[2].split('/')
+                revmask = self._cidr2revmask(cidr)
+                print '  deny ip %s %s any' % (network, revmask)
+            if options.ipv6 and rirtype == 'ipv6':
+                start = line[3]
+                value = line[4]
+                print '  deny ip %s/%s any' % (start, value)
+
+    def _cisco_router(self, options):
+        lastcc = ''
+        seq = 10
+        for line in self.records:
+            cc = line[0]
+            country = line[1]
+            if not country:
+                country = '[Unknown ISO-3166 Country Code]'
+            rirtype = line[5]
+            if cc != lastcc:
+                seq = 10
+                name = '%s:%s' % (cc, country)
+                lastcc = cc
+                print '\n! prefix-list %s:%s' % (cc, country)
+            if options.ipv4 and rirtype == 'ipv4':
+                network, cidr = line[2].split('/')
+                print 'ip prefix-list %s seq %d deny %s/%s' % \
+                    (name, seq, network, cidr)
+            if options.ipv6 and rirtype == 'ipv6':
+                start = line[3]
+                value = line[4]
+                print 'ipv6 prefix-list %s seq %d deny %s/%s' % \
+                    (name, seq, start, value)
+            seq += 10
 
     def run(self, options):
         self._get_dbrecords(options)
         if options.iptables:
             self._iptables(options)
-        if options.asa:
+        elif options.asa:
             self._asa(options)
+        elif options.switch:
+            self._cisco_switch(options)
+        elif options.router:
+            self._cisco_router(options)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--iptables', action='store_true',
         default=False,
-        help='produce IP tables output')
+        help='output iptables format')
     parser.add_argument(
         '--ipv4', action='store_true',
         default=False,
-        help='ipv4 only')
+        help='ipv4 addresses')
     parser.add_argument(
         '--ipv6', action='store_true',
         default=False,
-        help='ipv6 only')
+        help='ipv6 addresses')
     parser.add_argument(
         '--asa', action='store_true',
         default=False,
-        help='produce Cisco ASA output')
+        help='output Cisco ASA format')
     parser.add_argument(
-        '--country', help='specify country to produce output for'
+        '--switch', action='store_true',
+        default=False,
+        help='output Cisco switch ACL format')
+    parser.add_argument(
+        '--router', action='store_true',
+        default=False,
+        help='output Cisco router prefix list format')
+    parser.add_argument(
+        '--country', help='search for a specific country name'
     )
     parser.add_argument(
-        '--cc', help='specify a country code to produce output for'
+        '--cc', help='search for a specific country code'
     )
     options = parser.parse_args()
+    if not (options.ipv4 or options.ipv6):
+        parser.print_help()
+        print '\r\nERROR: either --ipv4 or --ipv6 and an output format must be specified'
+        sys.exit(1)
+    elif not (options.iptables or options.asa or options.switch or options.router):
+        parser.print_help()
+        print '\r\nERROR: please specify an output format (--iptables/--asa/--switch/--router)'
+        sys.exit(1)
+        
     riracl = RIRACL()
-    if options:
-        riracl.run(options)
+    riracl.run(options)
