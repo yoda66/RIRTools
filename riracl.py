@@ -117,32 +117,63 @@ access-list deny_country_egress extended \
 deny ip any object-group %s""" % (obj)
 
     def _cisco_switch(self, options):
+        if options.ipv4 and options.ipv6:
+            print 'ERROR: Cannot process both v4 and v6 ACLs'
+            return
         lastcc = ''
+        seq = 10
         for line in self.records:
             cc = line[0]
             country = line[1]
             if not country:
                 country = '[Unknown ISO-3166 Country Code]'
+
             rirtype = line[5]
+            proto = rirtype
+            if proto == 'ipv4':
+                proto = 'ip'
+
             if cc != lastcc:
-                header = '! %s: %s' % (cc, country)
+                header = '\n! %s: %s' % (cc, country)
+                xt = ''
                 if options.ipv4:
-                    header += '\nip access-list extended %s:%s' % \
-                        (cc, country)
-                elif options.ipv6:
-                    header += '\nipv6 access-list %s:%s' % (cc, country)
+                    xt = 'extended '
+                header += '\n%s access-list %s%s:%s_%s' % \
+                        (proto, xt, cc, country, proto)
+                if lastcc != '':
+                    if options.ipv6:
+                        print '  seq %d permit %s any any' % (seq, proto)
+                    else:
+                        print '  %d permit %s any any' % (seq, proto)
                 print '%s' % (header)
                 lastcc = cc
+                seq = 10
+
             if options.ipv4 and rirtype == 'ipv4':
                 network, cidr = line[2].split('/')
                 revmask = self._cidr2revmask(cidr)
-                print '  deny ip %s %s any' % (network, revmask)
-            if options.ipv6 and rirtype == 'ipv6':
+                print '  %d deny ip %s %s any' % (seq, network, revmask)
+                if options.bidir:
+                    print '  %d deny ip any %s %s' % \
+                        (seq + 1, network, revmask)
+            elif options.ipv6 and rirtype == 'ipv6':
                 start = line[3]
                 value = line[4]
-                print '  deny ip %s/%s any' % (start, value)
+                print '  seq %d deny ipv6 %s/%s any' % (seq, start, value)
+                if options.bidir:
+                    print '  seq %d deny ipv6 any %s/%s' % \
+                        (seq + 1, start, value)
+            seq += 10
+
+        if options.ipv6:
+            print '  seq %d permit %s any any' % (seq, proto)
+        else:
+            print '  %d permit %s any any' % (seq, proto)
 
     def _cisco_router(self, options):
+        if options.ipv4 and options.ipv6:
+            print 'ERROR: Cannot process both v4 and v6 ACLs'
+            return
         lastcc = ''
         seq = 10
         for line in self.records:
@@ -153,14 +184,14 @@ deny ip any object-group %s""" % (obj)
             rirtype = line[5]
             if cc != lastcc:
                 seq = 10
-                name = '%s:%s' % (cc, country)
+                name = '%s:%s_%s' % (cc, country, rirtype)
                 lastcc = cc
                 print '\n! prefix-list %s:%s' % (cc, country)
             if options.ipv4 and rirtype == 'ipv4':
                 network, cidr = line[2].split('/')
                 print 'ip prefix-list %s seq %d deny %s/%s' % \
                     (name, seq, network, cidr)
-            if options.ipv6 and rirtype == 'ipv6':
+            elif options.ipv6 and rirtype == 'ipv6':
                 start = line[3]
                 value = line[4]
                 print 'ipv6 prefix-list %s seq %d deny %s/%s' % \
@@ -188,6 +219,10 @@ if __name__ == '__main__':
         '--ipv4', action='store_true',
         default=False,
         help='ipv4 addresses')
+    parser.add_argument(
+        '--bidir', action='store_true',
+        default=False,
+        help='create bidirectional ACLs for switches')
     parser.add_argument(
         '--ipv6', action='store_true',
         default=False,
