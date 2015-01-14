@@ -65,13 +65,11 @@ provided to the tool.
 Example uses:
 
     $ ./riracl.py --ipv4 --iptables --cc KP
-
     # KP: Korea, Democratic People's Republic of
     -A INPUT -p ip -s 175.45.176.0/22 -j DROP
 
 
     $ ./riracl.py --ipv4 --switch --cc BT
-
     ! BT: Bhutan
     ip access-list extended BT:Bhutan_ip
       10 deny ip 43.241.136.0 0.0.3.255 any
@@ -85,6 +83,17 @@ Example uses:
       90 deny ip 202.89.24.0 0.0.7.255 any
       100 deny ip 202.144.128.0 0.0.31.255 any
       110 permit ip any any
+
+
+    $ ./riracl.py --ipv6 --router --country Myanmar 
+    ! prefix-list MM:Myanmar
+    ipv6 prefix-list MM:Myanmar_ipv6 seq 10 deny 2400:8480::/32
+    ipv6 prefix-list MM:Myanmar_ipv6 seq 20 deny 2401:bc80::/32
+    ipv6 prefix-list MM:Myanmar_ipv6 seq 30 deny 2401:f200::/32
+    ipv6 prefix-list MM:Myanmar_ipv6 seq 40 deny 2406:ea00::/32
+    ipv6 prefix-list MM:Myanmar_ipv6 seq 50 deny 2407:6100::/32
+    ipv6 prefix-list MM:Myanmar_ipv6 seq 60 deny 2407:f300::/32
+
 
 ## Sponsors
 
