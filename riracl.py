@@ -210,7 +210,19 @@ deny ip any object-group %s""" % (obj)
             self._cisco_router(options)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+
+    VERSION = '20150113_1033'
+    desc = """
+----------------------------------
+ Version %s
+ Author: Joff Thyer (c) 2015
+ Black Hills Information Security
+----------------------------------
+""" % (VERSION)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=desc
+    )
     parser.add_argument(
         '--iptables', action='store_true',
         default=False,
@@ -246,6 +258,7 @@ if __name__ == '__main__':
         '--cc', help='search for a specific country code'
     )
     options = parser.parse_args()
+
     if not (options.ipv4 or options.ipv6):
         parser.print_help()
         print '\r\nERROR: either --ipv4 or --ipv6 and an output format must be specified'
@@ -254,6 +267,6 @@ if __name__ == '__main__':
         parser.print_help()
         print '\r\nERROR: please specify an output format (--iptables/--asa/--switch/--router)'
         sys.exit(1)
-        
+
     riracl = RIRACL()
     riracl.run(options)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import csv
 import re
 import hashlib
@@ -229,5 +230,13 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
 
 
 if __name__ == '__main__':
+    print """
+[*] ---------------------------------------------
+[*] %s Version 20150113_1010
+[*] Author: Joff Thyer (c) 2015
+[*] Black Hills Information Security
+[*] ---------------------------------------------
+""" % (sys.argv[0])
+
     rirdb = RIRDatabase()
     rirdb.run()
