@@ -52,8 +52,10 @@ class RIRLogStats:
             elif options.dst:
                 rxp = r'.+DST=((\d{1,3}\.){3}\d{1,3})'
         elif options.ipv6:
-            print 'IPv6 is not yet supported'
-            return
+            if options.src:
+                rxp = r'.+SRC=((\d{4}:){7}\d{4})'
+            elif options.dst:
+                rxp = r'.+DST=((\d{4}:){7}\d{4})'
 
         total = 0
         for line in data.split('\n'):
