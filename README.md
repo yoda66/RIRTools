@@ -71,7 +71,7 @@ Example uses:
 
     $ ./riracl.py --ipv4 --switch --cc BT
     ! BT: Bhutan
-    ip access-list extended BT:Bhutan_ip
+    ip access-list extended BT:Bhutan_ipv4
       10 deny ip 43.241.136.0 0.0.3.255 any
       20 deny ip 45.64.248.0 0.0.3.255 any
       30 deny ip 103.7.252.0 0.0.3.255 any
