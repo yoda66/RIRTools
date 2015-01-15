@@ -94,6 +94,12 @@ Example uses:
     ipv6 prefix-list MM:Myanmar_ipv6 seq 50 deny 2407:6100::/32
     ipv6 prefix-list MM:Myanmar_ipv6 seq 60 deny 2407:f300::/32
 
+## logstats.py
+
+This is an experimental program which currently reads an iptables log format
+looking for "SRC=" lines and then counting the frequency of matches on a per
+IP address basis.  Each IP is then looked up in the RIR database, and a country
+name attribution is shown along with a TOP N summary of firewall hits.
 
 ## Sponsors
 
