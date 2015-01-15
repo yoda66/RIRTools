@@ -69,7 +69,7 @@ class RIRLogStats:
                     self.freq[cc] = 1
                 else:
                     self.freq[cc] += 1
-            total += 1
+                total += 1
 
         print """
  Top %d IPTABLES Firewall Hits by Source Country
@@ -123,7 +123,8 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
 
     def run(self, options):
         self._get_dbrecords(options)
-        self._iptables_log(options)
+        if options.iptables:
+            self._iptables_log(options)
 
 
 if __name__ == '__main__':
