@@ -5,13 +5,7 @@ import os
 import sys
 import struct
 import socket
-import csv
-import re
-import hashlib
-import math
-import urllib2
 import sqlite3
-from datetime import datetime, timedelta
 
 
 class RIRACL:
@@ -139,7 +133,7 @@ deny ip any object-group %s""" % (obj)
                 if options.ipv4:
                     xt = 'extended '
                 header += '\n%s access-list %s%s:%s_%s' % \
-                        (proto, xt, cc, country, proto)
+                          (proto, xt, cc, country, proto)
                 if lastcc != '':
                     if options.ipv6:
                         print '  seq %d permit %s any any' % (seq, proto)
@@ -261,11 +255,16 @@ if __name__ == '__main__':
 
     if not (options.ipv4 or options.ipv6):
         parser.print_help()
-        print '\r\nERROR: either --ipv4 or --ipv6 and an output format must be specified'
+        print """
+ERROR: either --ipv4 or --ipv6 and an output format must be specified
+"""
         sys.exit(1)
-    elif not (options.iptables or options.asa or options.switch or options.router):
+    elif not (options.iptables or options.asa or
+              options.switch or options.router):
         parser.print_help()
-        print '\r\nERROR: please specify an output format (--iptables/--asa/--switch/--router)'
+        print """
+ERROR: please specify an output format (--iptables/--asa/--switch/--router)
+"""
         sys.exit(1)
 
     riracl = RIRACL()
