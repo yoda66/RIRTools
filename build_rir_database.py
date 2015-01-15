@@ -199,6 +199,9 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
         except Exception as e:
             print '[*] Exception: %s' % (e)
             return
+        cur.execute("INSERT INTO country_codes VALUES ('EU', 'non-iso3166:Europe')")
+        cur.execute("INSERT INTO country_codes VALUES ('AP', 'non-iso3166:Asia-Pacific')")
+        recs += 2
         self.dbh.commit()
         print '[*] %d country codes updated.' % (recs)
 
