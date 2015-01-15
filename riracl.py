@@ -133,7 +133,7 @@ deny ip any object-group %s""" % (obj)
                 if options.ipv4:
                     xt = 'extended '
                 header += '\n%s access-list %s%s:%s_%s' % \
-                          (proto, xt, cc, country, proto)
+                          (proto, xt, cc, country, rirtype)
                 if lastcc != '':
                     if options.ipv6:
                         print '  seq %d permit %s any any' % (seq, proto)
