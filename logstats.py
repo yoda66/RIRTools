@@ -80,7 +80,7 @@ class RIRLogStats:
             if top > int(options.top):
                 break
             percent = (float(self.freq[r]) / total) * 100.0
-            print '%02d: %30s | hits = %5d (%5.2f%%)' % \
+            print '%02d: %30s | hits = %6d (%5.2f%%)' % \
                 (top, self.country[r], self.freq[r], percent)
             top += 1
         print """\
