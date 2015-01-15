@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import sys
 import re
 import os
 import math
@@ -68,9 +69,15 @@ class RIRLogStats:
         f = open(options.iptables, 'r')
         data = f.read()
         f.close()
+
+        if options.src:
+            rxp = r'.+SRC=((\d{1,3}\.){3}\d{1,3})'
+        elif options.dst:
+            rxp = r'.+DST=((\d{1,3}\.){3}\d{1,3})'
+
         total = 0
         for line in data.split('\n'):
-            m = re.match(r'.+SRC=((\d{1,3}\.){3}\d{1,3})', line)
+            m = re.match(rxp, line)
             if not m:
                 continue
             elif self._RFC1918(m.group(1)):
@@ -127,14 +134,14 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
 
 if __name__ == '__main__':
 
-    VERSION = '20150113_1033'
+    VERSION = '20150114_1132'
     desc = """
 ----------------------------------
- Version %s
+ %s version %s
  Author: Joff Thyer (c) 2015
  Black Hills Information Security
 ----------------------------------
-""" % (VERSION)
+""" % (os.path.basename(sys.argv[0]), VERSION)
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=desc
@@ -151,9 +158,26 @@ if __name__ == '__main__':
         default=False, help='ipv4 addresses'
     )
     parser.add_argument(
+        '--src', action='store_true',
+        default=False, help='search for source addresses (default)'
+    )
+    parser.add_argument(
+        '--dst', action='store_true',
+        default=False, help='search for destination addresses'
+    )
+    parser.add_argument(
         '--top', default=10, help='output top N countries'
     )
     options = parser.parse_args()
 
+    if not (options.ipv4 or options.iptables):
+        parser.print_help()
+        print '\nERROR: Please specify the --ipv4 flag and a log format'
+        sys.exit(1)
+
+    if not (options.src or options.dst):
+        options.src = True
+
+    print '%s' % (desc)
     logstats = RIRLogStats()
     logstats.run(options)
