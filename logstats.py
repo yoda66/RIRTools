@@ -22,14 +22,6 @@ class RIRLogStats:
         self.country = {}
         self.freq = {}
 
-    def _cidr2mask(self, cidr):
-        b_mask = (0xffffffff00000000 >> int(cidr)) & 0xffffffff
-        return socket.inet_ntoa(struct.pack('!L', b_mask))
-
-    def _cidr2revmask(self, cidr):
-        b_mask = ~(0xffffffff00000000 >> int(cidr)) & 0xffffffff
-        return socket.inet_ntoa(struct.pack('!L', b_mask))
-
     def _RFC1918(self, ip):
         rfc1918 = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
         for n in rfc1918:
@@ -41,42 +33,22 @@ class RIRLogStats:
                 return True
         return False
 
-    def _iptables_log(self, options):
-        f = open(options.iptables, 'r')
-        data = f.read()
-        f.close()
+    def _update_freq(self, ip):
+        rib_entry = self.rib.search_best(ip)
+        if not rib_entry:
+            return 0
+        cc = rib_entry.data['cc']
+        if cc not in self.freq:
+            self.freq[cc] = 1
+        else:
+            self.freq[cc] += 1
+        return 1
 
-        if options.ipv4:
-            if options.src:
-                rxp = r'.+SRC=((\d{1,3}\.){3}\d{1,3})'
-            elif options.dst:
-                rxp = r'.+DST=((\d{1,3}\.){3}\d{1,3})'
-        elif options.ipv6:
-            if options.src:
-                rxp = r'.+SRC=((\d{4}:){7}\d{4})'
-            elif options.dst:
-                rxp = r'.+DST=((\d{4}:){7}\d{4})'
-
-        total = 0
-        for line in data.split('\n'):
-            m = re.match(rxp, line)
-            if not m:
-                continue
-            elif self._RFC1918(m.group(1)):
-                continue
-            rib_entry = self.rib.search_best(m.group(1))
-            if rib_entry:
-                cc = rib_entry.data['cc']
-                if cc not in self.freq:
-                    self.freq[cc] = 1
-                else:
-                    self.freq[cc] += 1
-                total += 1
-
+    def _print_freq_summary(self, title, total):
         print """
- Top %d IPTABLES Firewall Hits by Source Country
+ Top %d %s Firewall Hits by Source Country
 ------------------------------------------------------------------\
-""" % (int(options.top))
+""" % (int(options.top), title)
         top = 1
         for r in sorted(self.freq, key=self.freq.__getitem__, reverse=True):
             if top > int(options.top):
@@ -87,6 +59,51 @@ class RIRLogStats:
             top += 1
         print """\
 ------------------------------------------------------------------"""
+
+    def _asa_log(self, options):
+        if options.ipv4:
+            rxp = re.compile(r'.+Deny\s([A-Za-z]{2,4})\s.+((\d{1,3}\.){3}\d{1,3})(\s|/\d+).+((\d{1,3}\.){3}\d{1,3})')
+        if options.src:
+            gi = 2
+        elif options.dst:
+            gi = 5
+
+        total = 0
+        f = open(options.asa, 'r')
+        for line in f:
+            m = rxp.match(line)
+            if not m:
+                continue
+            elif self._RFC1918(m.group(gi)):
+                continue
+            total += self._update_freq(m.group(gi))
+
+        f.close()
+        self._print_freq_summary('ASA', total)
+
+    def _iptables_log(self, options):
+        if options.ipv4:
+            if options.src:
+                rxp = re.compile(r'.+SRC=((\d{1,3}\.){3}\d{1,3})')
+            elif options.dst:
+                rxp = re.compile(r'.+DST=((\d{1,3}\.){3}\d{1,3})')
+        elif options.ipv6:
+            if options.src:
+                rxp = re.compile(r'.+SRC=((\d{4}:){7}\d{4})')
+            elif options.dst:
+                rxp = re.compile(r'.+DST=((\d{4}:){7}\d{4})')
+
+        total = 0
+        f = open(options.iptables, 'r')
+        for line in f:
+            m = rxp.match(line)
+            if not m:
+                continue
+            elif self._RFC1918(m.group(1)):
+                continue
+            total += self._update_freq(m.group(1))
+        f.close()
+        self._print_freq_summary('IPTABLES', total)
 
     def _get_dbrecords(self, options):
         cur = self.dbh.cursor()
@@ -127,6 +144,8 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
         self._get_dbrecords(options)
         if options.iptables:
             self._iptables_log(options)
+        elif options.asa:
+            self._asa_log(options)
 
 
 if __name__ == '__main__':
@@ -145,6 +164,9 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--iptables', help='specify iptables logfile'
+    )
+    parser.add_argument(
+        '--asa', help='specify asa logfile'
     )
     parser.add_argument(
         '--ipv4', action='store_true',
