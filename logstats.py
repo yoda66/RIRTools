@@ -54,19 +54,30 @@ class RIRLogStats:
             if top > int(options.top):
                 break
             percent = (float(self.freq[r]) / total) * 100.0
-            print '%02d: %30s | hits = %6d (%5.2f%%)' % \
+            print '%02d: %30s | hits = %8d (%5.2f%%)' % \
                 (top, self.country[r], self.freq[r], percent)
             top += 1
         print """\
 ------------------------------------------------------------------"""
 
     def _asa_log(self, options):
+        r_ip = '((\d{1,3}\.){3}\d{1,3})'
+        r_generic = '[ a-zA-Z:\(\)_\-]+'
+        r_proto = '[A-Za-z]{2,4}'
+        r_deny = r'^.+Deny\s%s\s%s%s/\d{1,5}%s%s.+$' % \
+            (r_proto, r_generic, r_ip, r_generic, r_ip)
+        r_built = r'^.+Built%s\d+%s%s/\d{1,5}\s\(%s/\d{1,5}\)%s%s/\d{1,5}.+$' % \
+            (r_generic, r_generic, r_ip, r_ip, r_generic, r_ip)
         if options.ipv4:
-            rxp = re.compile(r'.+Deny\s([A-Za-z]{2,4})\s.+((\d{1,3}\.){3}\d{1,3})(\s|/\d+).+((\d{1,3}\.){3}\d{1,3})')
+            if options.asa_allow:
+                rxp = re.compile(r_built)
+            else:
+                rxp = re.compile(r_deny)
+
         if options.src:
-            gi = 2
+            gi = 1
         elif options.dst:
-            gi = 5
+            gi = 3
 
         total = 0
         f = open(options.asa, 'r')
@@ -76,6 +87,8 @@ class RIRLogStats:
                 continue
             elif self._RFC1918(m.group(gi)):
                 continue
+            #print '[%s] [%s] [%s] [%s]' % (m.group(1), m.group(2), m.group(3), m.group(4))
+            #print '%s' % (line)
             total += self._update_freq(m.group(gi))
 
         f.close()
@@ -183,6 +196,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dst', action='store_true',
         default=False, help='search for destination addresses'
+    )
+    parser.add_argument(
+        '--asa_allow', action='store_true',
+        default=False, help='search for built connection data instead of Deny'
     )
     parser.add_argument(
         '--top', default=10, help='output top N countries'
