@@ -85,10 +85,8 @@ class RIRLogStats:
             m = rxp.match(line)
             if not m:
                 continue
-            elif self._RFC1918(m.group(gi)):
+            elif options.ipv4 and self._RFC1918(m.group(gi)):
                 continue
-            #print '[%s] [%s] [%s] [%s]' % (m.group(1), m.group(2), m.group(3), m.group(4))
-            #print '%s' % (line)
             total += self._update_freq(m.group(gi))
 
         f.close()
@@ -112,7 +110,7 @@ class RIRLogStats:
             m = rxp.match(line)
             if not m:
                 continue
-            elif self._RFC1918(m.group(1)):
+            elif options.ipv4 and self._RFC1918(m.group(1)):
                 continue
             total += self._update_freq(m.group(1))
         f.close()
