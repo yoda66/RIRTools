@@ -80,7 +80,7 @@ class RIRLogStats:
             gi = 3
 
         total = 0
-        if options.iptables == "-":
+        if options.asa == "-":
             f = sys.stdin.readlines()
         else:
             f = open(options.asa, 'r')
