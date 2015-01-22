@@ -80,7 +80,11 @@ class RIRLogStats:
             gi = 3
 
         total = 0
-        f = open(options.asa, 'r')
+        if options.iptables == "-":
+            f = sys.stdin.readlines()
+        else:
+            f = open(options.asa, 'r')
+
         for line in f:
             m = rxp.match(line)
             if not m:
@@ -89,7 +93,10 @@ class RIRLogStats:
                 continue
             total += self._update_freq(m.group(gi))
 
-        f.close()
+        try:
+            f.close()
+        except:
+            pass
         self._print_freq_summary('ASA', total)
 
     def _iptables_log(self, options):
@@ -105,7 +112,11 @@ class RIRLogStats:
                 rxp = re.compile(r'.+DST=((\d{4}:){7}\d{4})')
 
         total = 0
-        f = open(options.iptables, 'r')
+        if options.iptables == "-":
+            f = sys.stdin.readlines()
+        else:
+            f = open(options.iptables, 'r')
+
         for line in f:
             m = rxp.match(line)
             if not m:
@@ -113,7 +124,10 @@ class RIRLogStats:
             elif options.ipv4 and self._RFC1918(m.group(1)):
                 continue
             total += self._update_freq(m.group(1))
-        f.close()
+        try:
+            f.close()
+        except:
+            pass
         self._print_freq_summary('IPTABLES', total)
 
     def _get_dbrecords(self, options):
@@ -151,7 +165,22 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
             rnode.data['cc'] = cc
             rnode.data['country_name'] = country_name
 
+    def _verify_file(self, options):
+        if options.iptables:
+            file=options.iptables
+        elif options.asa:
+            file=options.asa
+        else:
+            print "No File specified"
+            sys.exit(1)
+
+        if not os.path.isfile(file) and str(file) != "-":
+            print "File NOT Found: %s" % ( file )
+            sys.exit(1)
+
+
     def run(self, options):
+        self._verify_file(options)
         self._get_dbrecords(options)
         if options.iptables:
             self._iptables_log(options)
@@ -213,5 +242,13 @@ if __name__ == '__main__':
         options.src = True
 
     print '%s' % (desc)
+    if not options.iptables and not options.asa:
+        print "Syntax error:"
+        print "\tYou must specify at least one of:"
+        print "\t\t--iptables [LOGFILE|-]"
+        print "\t\t--asa [LOGFILE|-]\n"
+        print "\tTry running %s -h\n" % ( sys.argv[0] )
+        exit()
+
     logstats = RIRLogStats()
     logstats.run(options)
