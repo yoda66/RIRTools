@@ -126,11 +126,16 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
         return None
 
     def _get_rirdata(self, rir, datestr):
-        urlbase = 'ftp://ftp.%s.net/pub/stats/%s' % \
-            (rir, rir)
+        if options.http:
+            proto="http"
+        else:
+            proto="ftp"
+
+        urlbase = '%s://ftp.%s.net/pub/stats/%s' % \
+            (proto, rir, rir)
         if re.match(r'^ripencc', rir):
-            urlbase = 'ftp://ftp.%s.net/pub/stats/%s' % \
-                ('ripe', rir)
+            urlbase = '%s://ftp.%s.net/pub/stats/%s' % \
+                (proto, 'ripe', rir)
         datafile = 'delegated-%s-extended-%s' % (rir, datestr)
         url = '%s/%s' % (urlbase, datafile)
         req = urllib2.Request(url)
@@ -246,6 +251,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=desc
+    )
+    parser.add_argument(
+        '--http', action='store_true',
+        default=False, help='Retrieve RIR data over HTTP'
     )
     parser.add_argument(
         '--force', action='store_true',
