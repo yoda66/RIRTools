@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import os
 import sys
 import csv
@@ -224,7 +225,7 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
         f.close()
 
     def run(self):
-        if self.has_run_today():
+        if self.has_run_today() and not options.force:
             print '[*] Exiting: Data has already been fetched today'
             return
         self.update_country_codes()
@@ -233,13 +234,25 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
 
 
 if __name__ == '__main__':
-    print """
+
+    VERSION = '20150114_1132'
+    desc = """
 [*] ---------------------------------------------
-[*] %s Version 20150113_1010
+[*] %s version %s
 [*] Author: Joff Thyer (c) 2015
 [*] Black Hills Information Security
 [*] ---------------------------------------------
-""" % (sys.argv[0])
+""" % (os.path.basename(sys.argv[0]), VERSION)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=desc
+    )
+    parser.add_argument(
+        '--force', action='store_true',
+        default=False, help='Force DB update'
+    )
+    options = parser.parse_args()
 
+    print '%s' % (desc)
     rirdb = RIRDatabase()
     rirdb.run()
