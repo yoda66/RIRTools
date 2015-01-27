@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import os
 import sys
 import csv
@@ -125,11 +126,16 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
         return None
 
     def _get_rirdata(self, rir, datestr):
-        urlbase = 'ftp://ftp.%s.net/pub/stats/%s' % \
-            (rir, rir)
+        if options.http:
+            proto="http"
+        else:
+            proto="ftp"
+
+        urlbase = '%s://ftp.%s.net/pub/stats/%s' % \
+            (proto, rir, rir)
         if re.match(r'^ripencc', rir):
-            urlbase = 'ftp://ftp.%s.net/pub/stats/%s' % \
-                ('ripe', rir)
+            urlbase = '%s://ftp.%s.net/pub/stats/%s' % \
+                (proto, 'ripe', rir)
         datafile = 'delegated-%s-extended-%s' % (rir, datestr)
         url = '%s/%s' % (urlbase, datafile)
         req = urllib2.Request(url)
@@ -224,7 +230,7 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
         f.close()
 
     def run(self):
-        if self.has_run_today():
+        if self.has_run_today() and not options.force:
             print '[*] Exiting: Data has already been fetched today'
             return
         self.update_country_codes()
@@ -233,13 +239,29 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
 
 
 if __name__ == '__main__':
-    print """
+
+    VERSION = '20150122_1035'
+    desc = """
 [*] ---------------------------------------------
-[*] %s Version 20150113_1010
+[*] %s version %s
 [*] Author: Joff Thyer (c) 2015
 [*] Black Hills Information Security
 [*] ---------------------------------------------
-""" % (sys.argv[0])
+""" % (os.path.basename(sys.argv[0]), VERSION)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=desc
+    )
+    parser.add_argument(
+        '--http', action='store_true',
+        default=False, help='Retrieve RIR data over HTTP'
+    )
+    parser.add_argument(
+        '--force', action='store_true',
+        default=False, help='Force DB update'
+    )
+    options = parser.parse_args()
 
+    print '%s' % (desc)
     rirdb = RIRDatabase()
     rirdb.run()
