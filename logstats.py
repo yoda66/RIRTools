@@ -133,6 +133,30 @@ class RIRLogStats:
             pass
         self._print_freq_summary('IPTABLES', total)
 
+    def _ipf_log(self, options):
+        if options.ipv4:
+            if options.src:
+                rxp = re.compile(r'.+\s((\d{1,3}\.){3}\d{1,3})\,\d+\s->\s')
+            elif options.dst:
+                rxp = re.compile(r'.+\s->\s((\d{1,3}\.){3}\d{1,3})\,\d+')
+        elif options.ipv6:
+            if options.src:
+                rxp = re.compile(r'.+\s((\d{4}:){7}\d{4})\,\d+\s->\s')
+            elif options.dst:
+                rxp = re.compile(r'.+\s->\s((\d{4}:){7}\d{4})\,\d+')
+
+        total = 0
+        f = open(options.ipf, 'r')
+        for line in f:
+            m = rxp.match(line)
+            if not m:
+                continue
+            elif options.ipv4 and self._RFC1918(m.group(1)):
+                continue
+            total += self._update_freq(m.group(1))
+        f.close()
+        self._print_freq_summary('IPF', total)
+
     def _get_dbrecords(self, options):
         cur = self.dbh.cursor()
         if options.ipv4 and not options.ipv6:
@@ -189,6 +213,8 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
             self._iptables_log(options)
         elif options.asa:
             self._asa_log(options)
+        elif options.ipf:
+            self._ipf_log(options)
 
 
 if __name__ == '__main__':
@@ -210,6 +236,9 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--asa', help='specify asa logfile'
+    )
+    parser.add_argument(
+        '--ipf', help='specify BSD ipf logfile'
     )
     parser.add_argument(
         '--ipv4', action='store_true',
