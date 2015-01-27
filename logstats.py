@@ -45,14 +45,17 @@ class RIRLogStats:
         return 1
 
     def _print_freq_summary(self, title, total):
-        print """
- Top %d %s Firewall Hits by Source Country
-------------------------------------------------------------------\
-""" % (int(options.top), title)
+        if str(options.top).lower() == "all":
+            header = "\nAll %s Firewall Hits by Source Country\n" % ( title )
+        else:
+            header = "\n Top %d %s Firewall Hits by Source Country\n" % ( int(options.top), title)
+        print header
+
         top = 1
         for r in sorted(self.freq, key=self.freq.__getitem__, reverse=True):
-            if top > int(options.top):
-                break
+            if str(options.top).lower() != "all":
+                if top > int(options.top):
+                    break
             percent = (float(self.freq[r]) / total) * 100.0
             print '%02d: %30s | hits = %8d (%5.2f%%)' % \
                 (top, self.country[r], self.freq[r], percent)
@@ -161,7 +164,7 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
 
 if __name__ == '__main__':
 
-    VERSION = '20150114_1132'
+    VERSION = '20150122_1105'
     desc = """
 ----------------------------------
  %s version %s
@@ -200,7 +203,7 @@ if __name__ == '__main__':
         default=False, help='search for built connection data instead of Deny'
     )
     parser.add_argument(
-        '--top', default=10, help='output top N countries'
+        '--top', default=10, help='output top [N|all] countries'
     )
     options = parser.parse_args()
 
