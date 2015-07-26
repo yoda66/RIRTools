@@ -53,6 +53,25 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
         for row in cur.fetchall():
             self.records.append(row)
 
+    def _iplist(self, options):
+        lastcc = ''
+        for line in self.records:
+            cc = line[0]
+            country = line[1]
+            if not country:
+                country = '[Unknown ISO-3166 Country Code]'
+            cidr = line[2]
+            start = line[3]
+            value = line[4]
+            rirtype = line[5]
+            if cc != lastcc:
+                print '\n# %s: %s' % (cc, country)
+                lastcc = cc
+            if options.ipv4 and rirtype == 'ipv4':
+                print '%s' % (cidr)
+            if options.ipv6 and rirtype == 'ipv6':
+                print '%s/%s' % (start, value)
+
     def _iptables(self, options):
         lastcc = ''
         for line in self.records:
@@ -196,6 +215,8 @@ deny ip any object-group %s""" % (obj)
 
     def run(self, options):
         self._get_dbrecords(options)
+        if options.iplist:
+            self._iplist(options)
         if options.iptables:
             self._iptables(options)
         elif options.asa:
@@ -219,6 +240,10 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=desc
     )
+    parser.add_argument(
+        '--iplist', action='store_true',
+        default=False,
+        help='output iplist format')
     parser.add_argument(
         '--iptables', action='store_true',
         default=False,
@@ -273,11 +298,11 @@ if __name__ == '__main__':
 ERROR: either --ipv4 or --ipv6 and an output format must be specified
 """
         sys.exit(1)
-    elif not (options.iptables or options.asa or
+    elif not (options.iplist or options.iptables or options.asa or
               options.switch or options.router):
         parser.print_help()
         print """
-ERROR: please specify an output format (--iptables/--asa/--switch/--router)
+ERROR: please specify an output format (--iplist/--iptables/--asa/--switch/--router)
 """
         sys.exit(1)
 

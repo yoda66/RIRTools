@@ -146,7 +146,11 @@ class RIRLogStats:
                 rxp = re.compile(r'.+\s->\s((\d{4}:){7}\d{4})\,\d+')
 
         total = 0
-        f = open(options.ipf, 'r')
+        if options.ipf == "-":
+            f = sys.stdin.readlines()
+        else:
+            f = open(options.ipf, 'r')
+
         for line in f:
             m = rxp.match(line)
             if not m:
@@ -154,7 +158,10 @@ class RIRLogStats:
             elif options.ipv4 and self._RFC1918(m.group(1)):
                 continue
             total += self._update_freq(m.group(1))
-        f.close()
+        try:
+            f.close()
+        except:
+            pass
         self._print_freq_summary('IPF', total)
 
     def _get_dbrecords(self, options):
@@ -197,6 +204,8 @@ ORDER BY rir.cc, rir.type, rir.start_binary ASC
             file=options.iptables
         elif options.asa:
             file=options.asa
+        elif options.ipf:
+            file=options.ipf
         else:
             print "No File specified"
             sys.exit(1)
@@ -274,11 +283,12 @@ if __name__ == '__main__':
         options.src = True
 
     print '%s' % (desc)
-    if not options.iptables and not options.asa:
+    if not options.iptables and not options.asa and not options.ipf:
         print "Syntax error:"
         print "\tYou must specify at least one of:"
         print "\t\t--iptables [LOGFILE|-]"
         print "\t\t--asa [LOGFILE|-]\n"
+        print "\t\t--ipf [LOGFILE|-]"
         print "\tTry running %s -h\n" % ( sys.argv[0] )
         exit()
 
