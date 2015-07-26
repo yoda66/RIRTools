@@ -68,9 +68,11 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
                 print '\n# %s: %s' % (cc, country)
                 lastcc = cc
             if options.ipv4 and rirtype == 'ipv4':
-                print '-A INPUT -p ip -s %s -j DROP' % (cidr)
+                print '-A INPUT -p ip -s %s -j %s' % \
+                    (cidr, options.dropchain)
             if options.ipv6 and rirtype == 'ipv6':
-                print '-A INPUT -p ipv6 -s %s/%s -j DROP' % (start, value)
+                print '-A INPUT -p ipv6 -s %s/%s -j %s' % \
+                    (start, value, options.dropchain)
 
     def _asa(self, options):
         lastcc = ''
@@ -220,31 +222,43 @@ if __name__ == '__main__':
     parser.add_argument(
         '--iptables', action='store_true',
         default=False,
-        help='output iptables format')
+        help='output iptables format'
+    )
+    parser.add_argument(
+        '--dropchain',
+        default='DROP',
+        help='drop chain name for iptables'
+    )
     parser.add_argument(
         '--ipv4', action='store_true',
         default=False,
-        help='ipv4 addresses')
+        help='ipv4 addresses'
+    )
     parser.add_argument(
         '--bidir', action='store_true',
         default=False,
-        help='create bidirectional ACLs for switches')
+        help='create bidirectional ACLs for switches'
+    )
     parser.add_argument(
         '--ipv6', action='store_true',
         default=False,
-        help='ipv6 addresses')
+        help='ipv6 addresses'
+    )
     parser.add_argument(
         '--asa', action='store_true',
         default=False,
-        help='output Cisco ASA format')
+        help='output Cisco ASA format'
+    )
     parser.add_argument(
         '--switch', action='store_true',
         default=False,
-        help='output Cisco switch ACL format')
+        help='output Cisco switch ACL format'
+    )
     parser.add_argument(
         '--router', action='store_true',
         default=False,
-        help='output Cisco router prefix list format')
+        help='output Cisco router prefix list format'
+    )
     parser.add_argument(
         '--country', help='search for a specific country name'
     )
