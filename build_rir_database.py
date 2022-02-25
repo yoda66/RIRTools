@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import os
@@ -7,7 +7,9 @@ import csv
 import re
 import hashlib
 import math
-import urllib2
+import urllib.request
+import urllib.error
+import urllib.parse
 import sqlite3
 import socket
 from datetime import datetime, timedelta
@@ -19,14 +21,14 @@ class RIRDatabase:
         self.ALLRIRS = [
             'arin', 'apnic', 'afrinic', 'lacnic', 'ripencc'
         ]
-        dbhome = '%s/.rirdb' % (os.path.expanduser('~'))
+        dbhome = '{}/.rirdb'.format(os.path.expanduser('~'))
         if not os.path.exists(dbhome):
             os.mkdir(dbhome)
-        self.dbname = '%s/rir.db' % (dbhome)
-        self.lastfetch = '%s/lastfetchdate' % (dbhome)
-        self.dbh = self._sqlite3_connect()
+        self.dbname = '{}/rir.db'.format(dbhome)
+        self.lastfetch = '{}/lastfetchdate'.format(dbhome)
+        self.dbh = self.SQLconnect()
 
-    def _sqlite3_connect(self):
+    def SQLconnect(self):
         dbh = sqlite3.connect(self.dbname)
         dbh.text_factory = str
         cur = dbh.cursor()
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS country_codes
         dbh.commit()
         return dbh
 
-    def _insert_rir_recs(self, rir, data):
+    def Insert_RIR_Records(self, rir, data):
         if not data:
             return [0, 0]
         cur = self.dbh.cursor()
@@ -82,11 +84,8 @@ CREATE TABLE IF NOT EXISTS country_codes
                 start_binary = socket.inet_pton(
                     socket.AF_INET, start
                 )
-                cidr = '%s/%d' % \
-                    (
-                        start,
-                        32 - int(math.log(int(value), 2))
-                    )
+                cidr = '{}/{:d}'.format(
+                    start, 32 - int(math.log(int(value), 2)))
             elif type == 'ipv6':
                 start_binary = socket.inet_pton(
                     socket.AF_INET6, start
@@ -112,142 +111,134 @@ VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
         self.dbh.commit()
         return [recs, errs]
 
-    def _get_md5file(self, urlbase, datafile):
-        url = '%s/%s.md5' % (urlbase, datafile)
-        req = urllib2.Request(url)
-        try:
-            f = urllib2.urlopen(req)
-            line = f.read()
-            m = re.match(r'^.*([a-f0-9]{32}).*$', line)
-            if m:
-                return m.group(1)
-        except:
-            return None
+    def fetchMD5(self, urlbase, datafile):
+        url = '{}/{}.md5'.format(urlbase, datafile)
+        req = urllib.request.Request(url)
+        f = urllib.request.urlopen(req)
+        line = f.read().decode()
+        m = re.match(r'.*([a-f0-9]{32}).*', line)
+        if m:
+            return m.group(1)
         return None
 
-    def _get_rirdata(self, rir, datestr):
+    def GetRIRData(self, rir, datestr):
         if options.http:
-            proto="http"
+            proto = "http"
         else:
-            proto="ftp"
+            proto = "ftp"
 
-        urlbase = '%s://ftp.%s.net/pub/stats/%s' % \
-            (proto, rir, rir)
+        urlbase = '{}://ftp.{}.net/pub/stats/{}'.format(proto, rir, rir)
         if re.match(r'^ripencc', rir):
-            urlbase = '%s://ftp.%s.net/pub/stats/%s' % \
-                (proto, 'ripe', rir)
-        datafile = 'delegated-%s-extended-%s' % (rir, datestr)
-        url = '%s/%s' % (urlbase, datafile)
-        req = urllib2.Request(url)
+            urlbase = '{}://ftp.{}.net/pub/stats/{}'.format(proto, 'ripe', rir)
+        datafile = 'delegated-{}-extended-{}'.format(rir, datestr)
+        url = '{}/{}'.format(urlbase, datafile)
+        req = urllib.request.Request(url)
 
         try:
-            print '[*] Fetching [%s]' % (datafile)
-            f = urllib2.urlopen(req)
+            print('[*] Fetching [{}]'.format(datafile))
+            f = urllib.request.urlopen(req)
             data = f.read()
             md5_1 = hashlib.md5(data).hexdigest()
-            md5_2 = self._get_md5file(urlbase, datafile)
+            md5_2 = self.fetchMD5(urlbase, datafile)
             if md5_1 == md5_2:
-                return [url, 'ok', data]
+                return [url, 'ok', data.decode()]
             else:
                 return [url, 'error', 'md5 hash mismatch']
         except Exception as e:
             return [url, 'error', e]
 
-    def regional_registry_data(self):
+    def RegionalRegistryData(self):
         for rir in self.ALLRIRS:
             done = False
-            rdata = self._get_rirdata(rir, 'latest')
+            rdata = self.GetRIRData(rir, 'latest')
             if rdata[1] == 'ok':
-                recs, errs = self._insert_rir_recs(rir, rdata[2])
-                print '[*] Inserted %d records for [%s]' % \
-                    (recs, rir)
+                recs, errs = self.Insert_RIR_Records(rir, rdata[2])
+                print('[*] Inserted {:d} records for [{}]'.format(recs, rir))
                 if errs > 0:
-                    raise Exception('[*] Errors on insert %d' % (errs))
+                    raise Exception('[*] Errors on insert {:d}'.format(errs))
                 done = True
             else:
-                print '[-] ERROR: %s' % (rdata)
+                print('[-] ERROR: {}'.format(rdata))
             days = 0
             today = datetime.utcnow()
             while not done and days < 5:
                 date = today - timedelta(days=-days)
-                rdata = self._get_rirdata(rir, date.strftime('%Y%m%d'))
+                rdata = self.GetRIRData(rir, date.strftime('%Y%m%d'))
                 if rdata[1] == 'ok':
-                    recs, errs = self._insert_rir_recs(rir, rdata[2])
-                    print '[*] Inserted %d records for [%s]' % \
-                        (recs, rir)
+                    recs, errs = self.Insert_RIR_Records(rir, rdata[2])
+                    print('[*] Inserted {} records for [{}]'.format(recs, rir))
                     if errs > 0:
-                        raise Exception('[*] Errors on insert %d' % (errs))
+                        raise Exception(
+                            '[*] Errors on insert {:d}'.format(errs)
+                        )
                     done = True
                 else:
-                    print '[-] ERROR: %s' % (rdata)
+                    print('[-] ERROR: {}'.format(rdata))
                 days += 1
 
-    def update_country_codes(self):
+    def UpdateCountryCodes(self):
         cur = self.dbh.cursor()
         url = 'https://raw.githubusercontent.com/' + \
             'datasets/country-list/master/data.csv'
-        req = urllib2.Request(url)
-        try:
-            recs = 0
-            f = urllib2.urlopen(req)
-            data = f.read().split('\n')
-            if not data:
-                raise Exception('no data read from %s' % (url))
-            cur.execute('DELETE FROM country_codes')
-            for line in csv.reader(data):
-                if not line or (line[0] == 'Name' and line[1] == 'Code'):
-                    continue
-                sql = "INSERT INTO country_codes (cc, name) VALUES (?, ?)"
-                cc = unicode(line[1])
-                name = unicode(line[0], errors='ignore')
-                cur.execute(sql, [cc, name])
-                recs += 1
-        except Exception as e:
-            print '[*] Exception: %s' % (e)
-            return
-        cur.execute("INSERT INTO country_codes VALUES ('EU', 'non-iso3166:Europe')")
-        cur.execute("INSERT INTO country_codes VALUES ('AP', 'non-iso3166:Asia-Pacific')")
+        req = urllib.request.Request(url)
+
+        recs = 0
+        f = urllib.request.urlopen(req)
+        data = f.read().decode().split('\n')
+        if not data:
+            raise Exception('no data read from {}'.format(url))
+        cur.execute('DELETE FROM country_codes')
+        for line in csv.reader(data):
+            if not line or (line[0] == 'Name' and line[1] == 'Code'):
+                continue
+            sql = "INSERT INTO country_codes (cc, name) VALUES (?, ?)"
+            cc = line[1]
+            name = line[0]
+            cur.execute(sql, [cc, name])
+            recs += 1
+
+        cur.execute("""\
+INSERT INTO country_codes VALUES ('EU', 'non-iso3166:Europe')""")
+        cur.execute("""\
+INSERT INTO country_codes VALUES ('AP', 'non-iso3166:Asia-Pacific')""")
         recs += 2
         self.dbh.commit()
-        print '[*] %d country codes updated.' % (recs)
+        print('[*] %d country codes updated.' % (recs))
 
     def has_run_today(self):
         today = datetime.utcnow().strftime('%Y%m%d')
-        try:
-            f = open(self.lastfetch, 'r')
+        with open(self.lastfetch, 'r') as f:
             last = f.read()[:-1]
             f.close()
-            if today == last:
-                return True
-        except:
-            pass
+        if today == last:
+            return True
         return False
 
-    def update_lastdate(self):
+    def UpdateLastDate(self):
         today = datetime.utcnow().strftime('%Y%m%d')
         f = open(self.lastfetch, 'w')
-        f.write('%s\n' % (today))
+        f.write('{}\n'.format(today))
         f.close()
 
     def run(self):
         if self.has_run_today() and not options.force:
-            print '[*] Exiting: Data has already been fetched today'
+            print('[*] Exiting: Data has already been fetched today')
             return
-        self.update_country_codes()
-        self.regional_registry_data()
-        self.update_lastdate()
+        self.UpdateCountryCodes()
+        self.RegionalRegistryData()
+        self.UpdateLastDate()
 
 
 if __name__ == '__main__':
 
-    VERSION = '20150122_1035'
-    desc = """
-[*] ---------------------------------------------
-[*] %s version %s
-[*] Author: Joff Thyer (c) 2015
-[*] Black Hills Information Security
-[*] ---------------------------------------------
-""" % (os.path.basename(sys.argv[0]), VERSION)
+    VERSION = '20220225_0101'
+    desc = '''
+-------------------------------------------------
+   {} Version {}
+   Author: Joff Thyer (c) 2015-2022
+   Black Hills Information Security
+-------------------------------------------------
+'''.format(os.path.basename(sys.argv[0]), VERSION)
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=desc
@@ -262,6 +253,6 @@ if __name__ == '__main__':
     )
     options = parser.parse_args()
 
-    print '%s' % (desc)
+    print('{}'.format(desc))
     rirdb = RIRDatabase()
     rirdb.run()

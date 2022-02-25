@@ -103,7 +103,7 @@ name attribution is shown along with a TOP N summary of firewall hits.
 
 ## Sponsors
 
-[![Black Hills Information Security](http://www.blackhillsinfosec.com/_images/BHIS-Logo.png)](http://www.blackhillsinfosec.com)
+[![Black Hills Information Security](https://www.blackhillsinfosec.com/wp-content/uploads/2018/12/BHIS-logo-L-1024x1024-400x400.png)](http://www.blackhillsinfosec.com)
 
 Consulting | Research | Development | Training
 

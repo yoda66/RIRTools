@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import os
@@ -11,8 +11,8 @@ import sqlite3
 class RIRACL:
 
     def __init__(self):
-        dbhome = '%s/.rirdb' % (os.path.expanduser('~'))
-        self.dbname = '%s/rir.db' % (dbhome)
+        dbhome = '{}/.rirdb'.format(os.path.expanduser('~'))
+        self.dbname = '{}/rir.db'.format(dbhome)
         self.dbh = sqlite3.connect(self.dbname)
         self.records = []
 
@@ -39,14 +39,14 @@ SELECT  rir.cc, country_codes.name,
 FROM rir
 LEFT JOIN country_codes
 ON country_codes.cc = rir.cc
-%s
+{}
 AND (rir.status = 'assigned' or rir.status = 'allocated')
-""" % (sql_type)
+""".format(sql_type)
 
         if options.cc:
-            sql += "AND rir.cc = '%s'" % (options.cc.upper())
+            sql += "AND rir.cc = '{}'".format(options.cc.upper())
         elif options.country:
-            sql += "AND country_codes.name like '%s%%'" % (options.country)
+            sql += "AND country_codes.name like '{}%'".format(options.country)
         sql += 'ORDER BY rir.cc, rir.type, rir.start_binary ASC'
 
         cur.execute(sql)
@@ -65,12 +65,12 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
             value = line[4]
             rirtype = line[5]
             if cc != lastcc:
-                print '\n# %s: %s' % (cc, country)
+                print('\n# {}: {}'.format(cc, country))
                 lastcc = cc
             if options.ipv4 and rirtype == 'ipv4':
-                print '%s' % (cidr)
+                print('{}'.format(cidr))
             if options.ipv6 and rirtype == 'ipv6':
-                print '%s/%s' % (start, value)
+                print('{}/{}'.format(start, value))
 
     def _iptables(self, options):
         lastcc = ''
@@ -84,14 +84,14 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
             value = line[4]
             rirtype = line[5]
             if cc != lastcc:
-                print '\n# %s: %s' % (cc, country)
+                print('\n# {}: {}'.format(cc, country))
                 lastcc = cc
             if options.ipv4 and rirtype == 'ipv4':
-                print '-A INPUT -p ip -s %s -j %s' % \
-                    (cidr, options.dropchain)
+                print('-A INPUT -p ip -s {} -j {}'.format\
+                    (cidr, options.dropchain))
             if options.ipv6 and rirtype == 'ipv6':
-                print '-A INPUT -p ipv6 -s %s/%s -j %s' % \
-                    (start, value, options.dropchain)
+                print('-A INPUT -p ipv6 -s {}/{} -j {}'.format\
+                    (start, value, options.dropchain))
 
     def _asa(self, options):
         lastcc = ''
@@ -106,34 +106,34 @@ AND (rir.status = 'assigned' or rir.status = 'allocated')
             value = line[4]
             rirtype = line[5]
             if cc != lastcc:
-                objname = 'CountryCode:%s' % (cc)
+                objname = 'CountryCode:{}'.format(cc)
                 objects.append(objname)
-                print """
-! %s: %s
-object-group network %s""" % (cc, country, objname)
+                print("""
+! {}: {}
+object-group network {}""".format(cc, country, objname))
                 lastcc = cc
 
             if options.ipv4 and rirtype == 'ipv4':
                 network, cidr = cidrnet.split('/')
                 mask = self._cidr2mask(cidr)
-                print '    network-object %s %s' % (network, mask)
+                print('    network-object {} {}'.format(network, mask))
             if options.ipv6 and rirtype == 'ipv6':
-                print '    network-object %s/%s' % (start, value)
+                print('    network-object {}/{}'.format(start, value))
 
-        print '!'
+        print('!')
         for obj in objects:
-            print """\
+            print("""\
 access-list deny_country_ingress extended \
-deny ip object-group %s any""" % (obj)
+deny ip object-group {} any""".format(obj))
 
         for obj in objects:
-            print """\
+            print("""\
 access-list deny_country_egress extended \
-deny ip any object-group %s""" % (obj)
+deny ip any object-group {}""".format(obj))
 
     def _cisco_switch(self, options):
         if options.ipv4 and options.ipv6:
-            print 'ERROR: Cannot process both v4 and v6 ACLs'
+            print('ERROR: Cannot process both v4 and v6 ACLs')
             return
         lastcc = ''
         seq = 10
@@ -149,45 +149,45 @@ deny ip any object-group %s""" % (obj)
                 proto = 'ip'
 
             if cc != lastcc:
-                header = '\n! %s: %s' % (cc, country)
+                header = '\n! {}: {}'.format(cc, country)
                 xt = ''
                 if options.ipv4:
                     xt = 'extended '
-                header += '\n%s access-list %s%s:%s_%s' % \
+                header += '\n{} access-list {}{}:{}_{}'.format\
                           (proto, xt, cc, country, rirtype)
                 if lastcc != '':
                     if options.ipv6:
-                        print '  seq %d permit %s any any' % (seq, proto)
+                        print('  seq {} permit {} any any'.format(seq, proto))
                     else:
-                        print '  %d permit %s any any' % (seq, proto)
-                print '%s' % (header)
+                        print('  {} permit {} any any'.format(seq, proto))
+                print('{}'.format(header))
                 lastcc = cc
                 seq = 10
 
             if options.ipv4 and rirtype == 'ipv4':
                 network, cidr = line[2].split('/')
                 revmask = self._cidr2revmask(cidr)
-                print '  %d deny ip %s %s any' % (seq, network, revmask)
+                print('  {} deny ip {} {} any'.format(seq, network, revmask))
                 if options.bidir:
-                    print '  %d deny ip any %s %s' % \
-                        (seq + 1, network, revmask)
+                    print('  {} deny ip any {} {}'.format\
+                        (seq + 1, network, revmask))
             elif options.ipv6 and rirtype == 'ipv6':
                 start = line[3]
                 value = line[4]
-                print '  seq %d deny ipv6 %s/%s any' % (seq, start, value)
+                print('  seq {} deny ipv6 {}/{} any'.format(seq, start, value))
                 if options.bidir:
-                    print '  seq %d deny ipv6 any %s/%s' % \
-                        (seq + 1, start, value)
+                    print('  seq {} deny ipv6 any {}/{}'.format\
+                        (seq + 1, start, value))
             seq += 10
 
         if options.ipv6:
-            print '  seq %d permit %s any any' % (seq, proto)
+            print('  seq {} permit {} any any'.format(seq, proto))
         else:
-            print '  %d permit %s any any' % (seq, proto)
+            print('  {} permit {} any any'.format(seq, proto))
 
     def _cisco_router(self, options):
         if options.ipv4 and options.ipv6:
-            print 'ERROR: Cannot process both v4 and v6 ACLs'
+            print('ERROR: Cannot process both v4 and v6 ACLs')
             return
         lastcc = ''
         seq = 10
@@ -199,18 +199,18 @@ deny ip any object-group %s""" % (obj)
             rirtype = line[5]
             if cc != lastcc:
                 seq = 10
-                name = '%s:%s_%s' % (cc, country, rirtype)
+                name = '{}:{}_{}'.format(cc, country, rirtype)
                 lastcc = cc
-                print '\n! prefix-list %s:%s' % (cc, country)
+                print('\n! prefix-list {}:{}'.format(cc, country))
             if options.ipv4 and rirtype == 'ipv4':
                 network, cidr = line[2].split('/')
-                print 'ip prefix-list %s seq %d deny %s/%s' % \
-                    (name, seq, network, cidr)
+                print('ip prefix-list {} seq {} deny {}/{}'.format\
+                    (name, seq, network, cidr))
             elif options.ipv6 and rirtype == 'ipv6':
                 start = line[3]
                 value = line[4]
-                print 'ipv6 prefix-list %s seq %d deny %s/%s' % \
-                    (name, seq, start, value)
+                print('ipv6 prefix-list {} seq {} deny {}/{}'.format\
+                    (name, seq, start, value))
             seq += 10
 
     def run(self, options):
@@ -231,11 +231,11 @@ if __name__ == '__main__':
     VERSION = '20150113_1033'
     desc = """
 ----------------------------------
- Version %s
+ Version {}
  Author: Joff Thyer (c) 2015
  Black Hills Information Security
 ----------------------------------
-""" % (VERSION)
+""".format(VERSION)
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=desc
@@ -294,16 +294,16 @@ if __name__ == '__main__':
 
     if not (options.ipv4 or options.ipv6):
         parser.print_help()
-        print """
+        print("""
 ERROR: either --ipv4 or --ipv6 and an output format must be specified
-"""
+""")
         sys.exit(1)
     elif not (options.iplist or options.iptables or options.asa or
               options.switch or options.router):
         parser.print_help()
-        print """
+        print("""
 ERROR: please specify an output format (--iplist/--iptables/--asa/--switch/--router)
-"""
+""")
         sys.exit(1)
 
     riracl = RIRACL()
